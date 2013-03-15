@@ -1,10 +1,13 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
-SET(DEPENDENTS "dlog vconf haptic-plugin devman")
-
 SET(SRCS
-	src/haptic_module_file.c
-	src/haptic_module_internal.c)
+	src/haptic_module_internal.c
+	src/file.c
+	src/sysnoti.c)
+
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+SET(DEPENDENTS "dlog vconf haptic-plugin device-node")
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(rpkgs REQUIRED ${DEPENDENTS})
@@ -19,10 +22,9 @@ SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -Wl,--no-as-needed")
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
 
-ADD_LIBRARY(${PROJECT_NAME} SHARED ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${rpkgs_LDFLAGS})
-
 ADD_DEFINITIONS("-DPREFIX=\"${PREFIX}\"")
 ADD_DEFINITIONS("-DENABLE_DLOG_OUT -DSLP_DEBUG")
 
+ADD_LIBRARY(${PROJECT_NAME} SHARED ${SRCS})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${rpkgs_LDFLAGS})
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION lib)

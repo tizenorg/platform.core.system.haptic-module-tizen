@@ -21,13 +21,20 @@
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
-#include <devman.h>
+#include <device-node.h>
 
+#include "file.h"
 #include "haptic_module_log.h"
-#include "haptic_file.h"
 
-#define BITPERMS 50
-#define DEFAULT_EFFECT_HANDLE 0x02
+#define BITPERMS				50
+#define MAX_LEVEL				255.0f
+#define DEFAULT_EFFECT_HANDLE	0x02
+
+enum {
+	PLAY_HAPTIC = 0,
+	STOP_HAPTIC,
+	LEVEL_HAPTIC,
+};
 
 typedef struct {
 	unsigned char **ppbuffer;
@@ -105,7 +112,7 @@ static void __clean_up(void *arg)
 	int i = 0;
 
 	MODULE_LOG("clean up handler!!! : %d", tid);
-	SetHapticEnable(0);
+	__haptic_predefine_action(STOP_HAPTIC, NULL);
 
 	for (i = 0; i < pbuffer->channels; ++i) {
 		free(pbuffer->ppbuffer[i]);
@@ -123,21 +130,24 @@ static void* __play_cb(void *arg)
 {
 	BUFFER *pbuffer = (BUFFER*)arg;
 	int i = -1, j = -1, k = -1, value = -1;
+	unsigned char ch;
+	unsigned char prev = -1;
 
 	MODULE_LOG("Start thread");
 
 	pthread_cleanup_push(__clean_up, arg);
 
+	__haptic_predefine_action(PLAY_HAPTIC, NULL);
+
 	/* Copy buffer from source buffer */
 	for (i = 0; i < pbuffer->iteration; i++) {
 		for (j = 0; j < pbuffer->length; ++j) {
 			for (k = 0; k < pbuffer->channels; ++k) {
-				value = (pbuffer->ppbuffer[k][j] > 0) ? 1 : 0;
-				if (SetHapticEnable(value) < 0) {
-					MODULE_ERROR("SetHapticEnable fail");
-					pthread_exit((void *)-1);
+				ch = pbuffer->ppbuffer[k][j];
+				if (ch != prev) {
+					__haptic_predefine_action(LEVEL_HAPTIC, ch);
+					prev = ch;
 				}
-
 				usleep(BITPERMS * 1000);
 			}
 		}
@@ -150,7 +160,7 @@ static void* __play_cb(void *arg)
 int GetHapticLevelMax(int *max)
 {
 	int status = -1;
-	status = device_get_property(DEVTYPE_HAPTIC, HAPTIC_PROP_LEVEL_MAX, max);
+	status = device_get_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_LEVEL_MAX, max);
 	if (status < 0) {
 		MODULE_ERROR("device_get_property fail : %d", status);
 		return -1;
@@ -161,7 +171,7 @@ int GetHapticLevelMax(int *max)
 int SetHapticEnable(int value)
 {
 	int status = -1;
-	status = device_set_property(DEVTYPE_HAPTIC, HAPTIC_PROP_ENABLE, value);
+	status = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ENABLE, value);
 	if (status < 0) {
 		MODULE_ERROR("device_set_property fail : %d", status);
 		return -1;
@@ -172,7 +182,7 @@ int SetHapticEnable(int value)
 int SetHapticLevel(int value)
 {
 	int status = -1;
-	status = device_set_property(DEVTYPE_HAPTIC, HAPTIC_PROP_LEVEL, value);
+	status = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_LEVEL, value);
 	if (status < 0) {
 		MODULE_ERROR("device_set_property fail : %d", status);
 		return -1;
@@ -183,7 +193,7 @@ int SetHapticLevel(int value)
 int SetHapticOneshot(int value)
 {
 	int status = -1;
-	status = device_set_property(DEVTYPE_HAPTIC, HAPTIC_PROP_ONESHOT, value);
+	status = device_set_property(DEVICE_TYPE_VIBRATOR, PROP_VIBRATOR_ONESHOT, value);
 	if (status < 0) {
 		MODULE_ERROR("device_set_property fail : %d", status);
 		return -1;
@@ -225,8 +235,9 @@ int InsertHapticElement(unsigned char *vibe_buffer, int max_bufsize, HapticEleme
 	HapticFile *pfile = NULL;
 	int databuf = -1;
 	int needbuf = -1;
-	int stime, duration;
-	int i = -1, j = -1;
+	int duration;
+	unsigned char level;
+	int i = -1;
 
 	pfile = (HapticFile*)vibe_buffer;
 	if (_check_valid_haptic_format(pfile) < 0) {
@@ -234,24 +245,24 @@ int InsertHapticElement(unsigned char *vibe_buffer, int max_bufsize, HapticEleme
 		return -1;
 	}
 
-	stime = element->stime/BITPERMS;
 	duration = element->duration/BITPERMS;
+	level = (unsigned char)((unsigned int)element->level*MAX_LEVEL/100);
 
-	databuf = max_bufsize-sizeof(HapticFile);
-	needbuf = (stime+duration)*pfile->fmt.wBlockAlign;
-	MODULE_LOG("Data buffer size : %d, Need buffer size : %d", databuf, needbuf);
+	databuf = max_bufsize - sizeof(HapticFile);
+	needbuf = (pfile->fmt.dwDuration + duration)*pfile->fmt.wBlockAlign;
+	MODULE_LOG("Need buffer size : %d", needbuf);
 
 	if (databuf < needbuf) {
 		MODULE_ERROR("buffer lacks a memory : data buf(%d), need buf(%d)", databuf, needbuf);
 		return -1;
 	}
 
-	for (i = 0, j = stime; i < duration; ++i, j+=pfile->fmt.wBlockAlign) {
-		pfile->data.pData[j] = 0xFF;
+	for (i = pfile->fmt.dwDuration; i < pfile->fmt.dwDuration+duration; i++) {
+		pfile->data.pData[i] = level;
 	}
 
-	pfile->chunkSize = sizeof(HapticFile)+needbuf;
-	pfile->fmt.dwDuration = element->stime+element->duration;
+	pfile->chunkSize = sizeof(HapticFile)+needbuf ;
+	pfile->fmt.dwDuration = pfile->fmt.dwDuration+duration;
 	pfile->data.chunkSize = sizeof(DataChunk)+needbuf;
 	return 0;
 }
@@ -284,11 +295,12 @@ int GetHapticBufferDuration(const unsigned char *vibe_buffer, int *duration)
 	return 0;
 }
 
-int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int *effect_handle)
+int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int level, int *effect_handle)
 {
 	HapticFile *pfile = NULL;
 	unsigned char **ppbuffer = NULL;
-	unsigned int channels, length, align, magnitude;
+	unsigned int channels, length, align;
+	unsigned char data;
 	int i = -1, j = -1;
 
 	pfile = (HapticFile*)vibe_buffer;
@@ -309,8 +321,7 @@ int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int *effec
 	channels = pfile->fmt.wChannels;
 	align = pfile->fmt.wBlockAlign;
 	length = (pfile->data.chunkSize-8)/align;
-	magnitude = pfile->fmt.dwMagnitude;
-	MODULE_LOG("channels : %d, length : %d, align : %d, magnitude : %d", channels, length, align, magnitude);
+	MODULE_LOG("channels : %d, length : %d, align : %d, level : %d", channels, length, align, level);
 
 	/* Create buffer */
 	ppbuffer = (unsigned char**)malloc(sizeof(unsigned char*)*channels);
@@ -322,7 +333,9 @@ int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int *effec
 	/* Copy buffer from source buffer */
 	for (i = 0; i < length; ++i) {
 		for (j = 0; j < channels; ++j) {
-			ppbuffer[j][i] = (unsigned char)(pfile->data.pData[i*align+j]);
+			data = (unsigned char)(pfile->data.pData[i*align+j]);
+			ppbuffer[j][i] = (unsigned char)(data*level/0xFF);
+			MODULE_LOG("ppbuffer[%2d][%2d] : data(%x) -> (%x)", j, i, data, ppbuffer[j][i]);
 		}
 	}
 

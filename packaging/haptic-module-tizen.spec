@@ -2,7 +2,7 @@
 Name:       haptic-module-tizen
 Summary:    Haptic Module library
 Version:    0.1.0
-Release:    4
+Release:    8
 Group:      System/Libraries
 License:    APLv2
 Source0:    %{name}-%{version}.tar.gz
@@ -10,7 +10,7 @@ BuildRequires: cmake
 BuildRequires: pkgconfig(dlog)
 BuildRequires: pkgconfig(vconf)
 BuildRequires: pkgconfig(haptic-plugin)
-BuildRequires: pkgconfig(devman)
+BuildRequires: pkgconfig(device-node)
 
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
