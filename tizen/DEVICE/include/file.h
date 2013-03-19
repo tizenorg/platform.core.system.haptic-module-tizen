@@ -71,5 +71,6 @@ int GetHapticBufferDuration(const unsigned char *vibe_buffer, int *duration);
 int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int level, int *effect_handle);
 int OpenHapticDevice(void);
 int CloseHapticDevice(void);
+int StopHaptic(void);
 
 #endif // __FIEL_H__

@@ -354,6 +354,13 @@ int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int level,
 	return 0;
 }
 
+int StopHaptic(void)
+{
+	__haptic_predefine_action(STOP_HAPTIC, NULL);
+
+	return 0;
+}
+
 int CloseHapticDevice(void)
 {
 	if (_cancel_thread() < 0) {
