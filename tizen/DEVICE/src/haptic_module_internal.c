@@ -478,13 +478,7 @@ static int _create_effect(unsigned char *vibe_buffer, int max_bufsize, haptic_mo
 	MODULE_LOG("effect count : %d", max_elemcnt);
 	for (i = 0; i < max_elemcnt; ++i) {
 		elem.duration = elem_arr[i].haptic_duration;
-		if (elem_arr[i].haptic_level == HAPTIC_FEEDBACK_AUTO) {
-			vconf_get_int(VCONFKEY_SETAPPL_TOUCH_FEEDBACK_VIBRATION_LEVEL_INT, &elem_arr[i].haptic_level);
-			elem.level = elem_arr[i].haptic_level*20;
-		}
-		else {
-			elem.level = elem_arr[i].haptic_level;
-		}
+		elem.level = elem_arr[i].haptic_level;
 		MODULE_LOG("%d) duration : %d, level : %d", i, elem_arr[i].haptic_duration, elem_arr[i].haptic_level);
 
 		status = InsertHapticElement(vibe_buffer, max_bufsize, &elem);
