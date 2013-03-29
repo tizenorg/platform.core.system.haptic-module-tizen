@@ -3,7 +3,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 SET(DEPENDENTS "dlog haptic-plugin")
 
 SET(SRCS
-	src/haptic_module_internal.c)
+	src/haptic.c)
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(rpkgs REQUIRED ${DEPENDENTS})

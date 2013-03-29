@@ -60,17 +60,15 @@ typedef struct _HapticElement {
 } HapticElement;
 
 int GetHapticLevelMax(int *max);
-int SetHapticEnable(int value);
-int SetHapticLevel(int value);
-int SetHapticOneshot(int value);
 
-int InitializeHapticBuffer(unsigned char *vibe_buffer, int max_bufsize);
-int InsertHapticElement(unsigned char *vibe_buffer, int max_bufsize, HapticElement *element);
-int GetHapticBufferSize(const unsigned char *vibe_buffer, int *size);
-int GetHapticBufferDuration(const unsigned char *vibe_buffer, int *duration);
-int PlayHapticBuffer(const unsigned char *vibe_buffer, int iteration, int level, int *effect_handle);
-int OpenHapticDevice(void);
-int CloseHapticDevice(void);
-int StopHaptic(void);
+int InitializeBuffer(unsigned char *vibe_buffer, int max_bufsize);
+int InsertElement(unsigned char *vibe_buffer, int max_bufsize, HapticElement *element);
+int GetBufferSize(const unsigned char *vibe_buffer, int *size);
+int GetBufferDuration(const unsigned char *vibe_buffer, int *duration);
+int PlayOneshot(int handle, int duration, int level);
+int PlayBuffer(int handle, const unsigned char *vibe_buffer, int iteration, int level);
+int Stop(int handle);
+int OpenDevice(int handle);
+int CloseDevice(int handle);
 
 #endif // __FIEL_H__

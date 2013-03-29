@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <time.h>
 #include <vconf.h>
 
 #include <haptic_plugin_intf.h>
@@ -34,7 +35,7 @@
 #define EXTAPI __attribute__ ((visibility("default")))
 #endif
 
-#define DEFAULT_MOTOR_COUNT	1
+#define DEFAULT_MOTOR_COUNT		1
 #define DEFAULT_DEVICE_HANDLE	0x01
 #define DEFAULT_EFFECT_HANDLE	0x02
 #define HAPTIC_FEEDBACK_AUTO	101
@@ -205,11 +206,10 @@ static int __save_file(const unsigned char *vibe_buferf, int size, const char *f
 	return 0;
 }
 
-static int __vibrate(const unsigned char *vibe_buffer, int iteration, int feedback, int priority, int *effect_handle)
+static int __vibrate(int device_handle, const unsigned char *vibe_buffer, int iteration, int feedback, int priority)
 {
 	int status;
 	int level;
-	int handle;
 
 	assert(vibe_buffer);
 
@@ -217,16 +217,18 @@ static int __vibrate(const unsigned char *vibe_buffer, int iteration, int feedba
 	if (status != HAPTIC_MODULE_ERROR_NONE)
 		return status;
 
-	status = PlayHapticBuffer(vibe_buffer, iteration, level, &handle);
+	status = PlayBuffer(device_handle, vibe_buffer, iteration, level);
 	if (status < 0) {
-		MODULE_ERROR("PlayHapticBuffer fail: %d", status);
+		MODULE_ERROR("PlayHapticBuffer fail : %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
-	if (effect_handle)
-		*effect_handle = handle;
-
 	return 0;
+}
+
+static void *_create_handle(void)
+{
+	return ((getpid()<<16)|time(NULL));
 }
 /* END of Static Function Section */
 
@@ -237,19 +239,28 @@ static int _get_device_count(int *count)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
 	*count = DEFAULT_MOTOR_COUNT;
-
 	return HAPTIC_MODULE_ERROR_NONE;
 }
 
 static int _open_device(int device_index, int *device_handle)
 {
+	int handle;
+	int status;
+
 	if (device_index < HAPTIC_MODULE_DEVICE_0 || device_index > HAPTIC_MODULE_DEVICE_ALL)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
 	if (device_handle == NULL)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	*device_handle = DEFAULT_DEVICE_HANDLE;
+	handle = _create_handle();
+	status = OpenDevice(handle);
+	if (status < 0) {
+		MODULE_ERROR("OpenHapticDevice fail :%d", status);
+		return HAPTIC_MODULE_OPERATION_FAILED;
+	}
+
+	*device_handle = handle;
 	return HAPTIC_MODULE_ERROR_NONE;
 }
 
@@ -260,7 +271,7 @@ static int _close_device(int device_handle)
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = CloseHapticDevice();
+	status = CloseDevice(device_handle);
 	if (status < 0) {
 		MODULE_ERROR("CloseHapticDevice fail : %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
@@ -272,7 +283,7 @@ static int _close_device(int device_handle)
 static int _vibrate_monotone(int device_handle, int duration, int feedback, int priority, int *effect_handle)
 {
 	int status;
-	int input_feedback;
+	int level;
 
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
@@ -292,24 +303,17 @@ static int _vibrate_monotone(int device_handle, int duration, int feedback, int 
 	if (feedback == HAPTIC_MODULE_FEEDBACK_MIN)
 		return HAPTIC_MODULE_ERROR_NONE;
 
-	status = __to_level(feedback, &input_feedback);
+	status = __to_level(feedback, &level);
 	if (status != HAPTIC_MODULE_ERROR_NONE)
 		return status;
 
-	status = SetHapticLevel(input_feedback);
+	status = PlayOneshot(device_handle, duration, level);
 	if (status < 0) {
-		MODULE_ERROR("SetHapticLevel fail : %d", status);
-		return HAPTIC_MODULE_OPERATION_FAILED;
-	}
-
-	status = SetHapticOneshot(duration);
-	if (status < 0) {
-		MODULE_ERROR("SetHapticOneshot fail : %d", status);
+		MODULE_ERROR("PlayOneshot fail : %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
 	*effect_handle = DEFAULT_EFFECT_HANDLE;
-
 	return HAPTIC_MODULE_ERROR_NONE;
 }
 
@@ -345,7 +349,7 @@ static int _vibrate_file(int device_handle, const char *file_path, int iteration
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
-	status = __vibrate(vibe_buffer, iteration, feedback , priority, effect_handle);
+	status = __vibrate(device_handle, vibe_buffer, iteration, feedback, priority);
 	free(vibe_buffer);
 
 	return status;
@@ -374,7 +378,7 @@ static int _vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, 
 	if (feedback == HAPTIC_MODULE_FEEDBACK_MIN)
 		return HAPTIC_MODULE_ERROR_NONE;
 
-	return __vibrate(vibe_buffer, iteration, feedback, priority, effect_handle);
+	return __vibrate(device_handle, vibe_buffer, iteration, feedback, priority);
 }
 
 static int _stop_effect(int device_handle, int effect_handle)
@@ -387,7 +391,7 @@ static int _stop_effect(int device_handle, int effect_handle)
 	if (effect_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = StopHaptic();
+	status = Stop(device_handle);
 	if (status < 0) {
 		MODULE_ERROR("StopHaptic fail : %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
@@ -403,7 +407,7 @@ static int _stop_all_effects(int device_handle)
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = StopHaptic();
+	status = Stop(device_handle);
 	if (status < 0) {
 		MODULE_ERROR("StopHaptic fail : %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
@@ -469,7 +473,7 @@ static int _create_effect(unsigned char *vibe_buffer, int max_bufsize, haptic_mo
 	if (max_elemcnt < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = InitializeHapticBuffer(vibe_buffer, max_bufsize);
+	status = InitializeBuffer(vibe_buffer, max_bufsize);
 	if (status < 0) {
 		MODULE_ERROR("InitializeHapticBuffer fail: %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
@@ -481,7 +485,7 @@ static int _create_effect(unsigned char *vibe_buffer, int max_bufsize, haptic_mo
 		elem.level = elem_arr[i].haptic_level;
 		MODULE_LOG("%d) duration : %d, level : %d", i, elem_arr[i].haptic_duration, elem_arr[i].haptic_level);
 
-		status = InsertHapticElement(vibe_buffer, max_bufsize, &elem);
+		status = InsertElement(vibe_buffer, max_bufsize, &elem);
 		if (status < 0) {
 			MODULE_ERROR("InsertHapticElement fail: %d", status);
 			return HAPTIC_MODULE_OPERATION_FAILED;
@@ -505,7 +509,7 @@ static int _save_effect(const unsigned char *vibe_buffer, int max_bufsize, const
 	if (file_path == NULL)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = GetHapticBufferSize(vibe_buffer, &size);
+	status = GetBufferSize(vibe_buffer, &size);
 	if (status < 0) {
 		MODULE_ERROR("GetHapticBufferSize fail: %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
@@ -518,7 +522,7 @@ static int _get_file_duration(int device_handle, const char *file_path, int *fil
 {
 	int status;
 	unsigned char *vibe_buffer;
-	int duration = -1;
+	int duration;
 
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
@@ -535,11 +539,10 @@ static int _get_file_duration(int device_handle, const char *file_path, int *fil
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
-	status = GetHapticBufferDuration(vibe_buffer, &duration);
+	status = GetBufferDuration(vibe_buffer, &duration);
 	free(vibe_buffer);
 	if (status < 0) {
 		MODULE_ERROR("GetHapticBufferDuration fail: %d", status);
-		free(vibe_buffer);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
@@ -561,14 +564,13 @@ static int _get_buffer_duration(int device_handle, const unsigned char *vibe_buf
 	if (buffer_duration == NULL)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	status = GetHapticBufferDuration(vibe_buffer, &duration);
+	status = GetBufferDuration(vibe_buffer, &duration);
 	if (status < 0) {
 		MODULE_ERROR("GetHapticBufferDuration fail: %d", status);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
 	*buffer_duration = duration;
-
 	return HAPTIC_MODULE_ERROR_NONE;
 }
 

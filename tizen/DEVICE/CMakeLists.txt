@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 SET(SRCS
-	src/haptic_module_internal.c
+	src/haptic.c
 	src/file.c
 	src/sysnoti.c)
 
