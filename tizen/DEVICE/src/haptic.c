@@ -186,18 +186,21 @@ static int __save_file(const unsigned char *vibe_buferf, int size, const char *f
 	status = fwrite(vibe_buferf, 1, size, pf);
 	if (status != size) {
 		MODULE_ERROR("To write file is failed");
+		fclose(pf);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
 	fd = fileno(pf);
 	if (fd == -1) {
 		MODULE_ERROR("To get file descriptor is failed");
+		fclose(pf);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
 	status = fsync(fd);
 	if (status == -1) {
 		MODULE_ERROR("To be synchronized with the disk is failed");
+		fclose(pf);
 		return HAPTIC_MODULE_OPERATION_FAILED;
 	}
 
