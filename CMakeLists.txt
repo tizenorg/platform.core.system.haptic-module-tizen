@@ -3,7 +3,7 @@ PROJECT(haptic-module C)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
-SET(LIBDIR "\${prefix}/lib")
+SET(LIBDIR ${LIB_INSTALL_DIR})
 SET(INCLUDEDIR "\${prefix}/include/${PROJECT_NAME}")
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
