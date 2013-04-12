@@ -70,5 +70,6 @@ int PlayBuffer(int handle, const unsigned char *vibe_buffer, int iteration, int 
 int Stop(int handle);
 int OpenDevice(int handle);
 int CloseDevice(int handle);
+int GetState(int handle, int *state);
 
 #endif // __FIEL_H__

@@ -31,6 +31,9 @@
 #define MAX_LEVEL				255.0f
 #define DEFAULT_EFFECT_HANDLE	0x02
 
+#define STATE_PLAY	0
+#define STATE_STOP	1
+
 #define PREDEF_HAPTIC           "haptic"
 
 enum {
@@ -67,6 +70,22 @@ static int _check_valid_haptic_format(HapticFile *file)
 	return 0;
 }
 
+static int __haptic_predefine_action(int handle, int prop, int val)
+{
+	char buf_pid[32];
+	char buf_prop[32];
+	char buf_handle[32];
+	char buf_val[32];
+
+	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
+	snprintf(buf_prop, sizeof(buf_prop), "%d", prop);
+	snprintf(buf_handle, sizeof(buf_handle), "%d", handle);
+	snprintf(buf_val, sizeof(buf_val), "%d", val);
+
+	MODULE_LOG("pid : %s(%d), prop : %s, handle : %s", buf_pid, pthread_self(), buf_prop, buf_handle);
+	return __haptic_call_predef_action(PREDEF_HAPTIC, 4, buf_pid, buf_prop, buf_handle, buf_val);
+}
+
 static int _create_thread(void* data, void*(*func)(void*))
 {
 	if (tid) {
@@ -92,6 +111,8 @@ static int _cancel_thread(void)
 		return 0;
 	}
 
+	__haptic_predefine_action(gbuffer.handle, STOP, NULL);
+
 	if ((ret = pthread_cancel(tid)) < 0) {
 		MODULE_ERROR("pthread_cancel is failed : %s, ret(%d)", strerror(errno), ret);
 		return -1;
@@ -113,29 +134,12 @@ static int _cancel_thread(void)
 	return 0;
 }
 
-static int __haptic_predefine_action(int handle, int prop, int val)
-{
-	char buf_pid[32];
-	char buf_prop[32];
-	char buf_handle[32];
-	char buf_val[32];
-
-	snprintf(buf_pid, sizeof(buf_pid), "%d", getpid());
-	snprintf(buf_prop, sizeof(buf_prop), "%d", prop);
-	snprintf(buf_handle, sizeof(buf_handle), "%d", handle);
-	snprintf(buf_val, sizeof(buf_val), "%d", val);
-
-	MODULE_LOG("pid : %s, prop : %s, handle : %s", buf_pid, buf_prop, buf_handle);
-	return __haptic_call_predef_action(PREDEF_HAPTIC, 4, buf_pid, buf_prop, buf_handle, buf_val);
-}
-
 static void __clean_up(void *arg)
 {
 	BUFFER *pbuffer = (BUFFER*)arg;
 	int i;
 
 	MODULE_LOG("clean up handler!!! : %d", tid);
-	__haptic_predefine_action(pbuffer->handle, STOP, NULL);
 
 	for (i = 0; i < pbuffer->channels; ++i) {
 		free(pbuffer->ppbuffer[i]);
@@ -159,8 +163,6 @@ static void* __play_cb(void *arg)
 	MODULE_LOG("Start thread");
 
 	pthread_cleanup_push(__clean_up, arg);
-
-	__haptic_predefine_action(pbuffer->handle, PLAY, NULL);
 
 	/* Copy buffer from source buffer */
 	for (i = 0; i < pbuffer->iteration; i++) {
@@ -357,6 +359,8 @@ int PlayBuffer(int handle, const unsigned char *vibe_buffer, int iteration, int 
 	gbuffer.length = length;
 	gbuffer.iteration = iteration;
 
+	__haptic_predefine_action(gbuffer.handle, PLAY, NULL);
+
 	/* Start thread */
 	if (_create_thread(&gbuffer, __play_cb) < 0) {
 		MODULE_ERROR("_create_thread fail");
@@ -416,4 +420,15 @@ int CloseDevice(int handle)
 
 	MODULE_LOG("pid : %s, prop : %s, handle : %s", buf_pid, buf_prop, buf_handle);
 	return __haptic_call_predef_action(PREDEF_HAPTIC, 3, buf_pid, buf_prop, buf_handle);
+}
+
+int GetState(int handle, int *state)
+{
+	if (gbuffer.handle == handle) {
+		*state = STATE_PLAY;
+		return 0;
+	}
+
+	*state = STATE_STOP;
+	return 0;
 }

@@ -35,10 +35,8 @@
 #define EXTAPI __attribute__ ((visibility("default")))
 #endif
 
+#define DEFAULT_EFFECT_HANDLE	0xFFFF
 #define DEFAULT_MOTOR_COUNT		1
-#define DEFAULT_DEVICE_HANDLE	0x01
-#define DEFAULT_EFFECT_HANDLE	0x02
-#define HAPTIC_FEEDBACK_AUTO	101
 #define HAPTIC_PLAY_FILE_EXT	".tht"
 
 /* START of Static Function Section */
@@ -231,10 +229,10 @@ static int __vibrate(int device_handle, const unsigned char *vibe_buffer, int it
 
 static void *_create_handle(void)
 {
-	return ((getpid()<<16)|time(NULL));
+	static int i = 0;
+	return ((getpid()<<16)|(time(NULL)+(i++)));
 }
 /* END of Static Function Section */
-
 
 static int _get_device_count(int *count)
 {
@@ -355,11 +353,14 @@ static int _vibrate_file(int device_handle, const char *file_path, int iteration
 	status = __vibrate(device_handle, vibe_buffer, iteration, feedback, priority);
 	free(vibe_buffer);
 
+	*effect_handle = DEFAULT_EFFECT_HANDLE;
 	return status;
 }
 
 static int _vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, int iteration, int feedback, int priority, int *effect_handle)
 {
+	int status;
+
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
@@ -381,7 +382,10 @@ static int _vibrate_buffer(int device_handle, const unsigned char *vibe_buffer, 
 	if (feedback == HAPTIC_MODULE_FEEDBACK_MIN)
 		return HAPTIC_MODULE_ERROR_NONE;
 
-	return __vibrate(device_handle, vibe_buffer, iteration, feedback, priority);
+	status = __vibrate(device_handle, vibe_buffer, iteration, feedback, priority);
+
+	*effect_handle = DEFAULT_EFFECT_HANDLE;
+	return status;
 }
 
 static int _stop_effect(int device_handle, int effect_handle)
@@ -445,6 +449,9 @@ static int _resume_effect(int device_handle, int effect_handle)
 
 static int _get_effect_state(int device_handle, int effect_handle, int *state)
 {
+	int status;
+	int cur_state;
+
 	if (device_handle < 0)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
@@ -454,8 +461,14 @@ static int _get_effect_state(int device_handle, int effect_handle, int *state)
 	if (state == NULL)
 		return HAPTIC_MODULE_INVALID_ARGUMENT;
 
-	MODULE_ERROR("This device is not supported this function(%s)", __func__);
-	return HAPTIC_MODULE_NOT_SUPPORTED;
+	status = GetState(device_handle, &cur_state);
+	if (status < 0) {
+		MODULE_ERROR("GetState fail : %d", status);
+		return HAPTIC_MODULE_OPERATION_FAILED;
+	}
+
+	*state = cur_state;
+	return HAPTIC_MODULE_ERROR_NONE;
 }
 
 static int _create_effect(unsigned char *vibe_buffer, int max_bufsize, haptic_module_effect_element *elem_arr, int max_elemcnt)
