@@ -55,6 +55,7 @@ typedef struct {
 
 static pthread_t tid;
 static BUFFER gbuffer;
+static int lock;
 
 static int _check_valid_haptic_format(HapticFile *file)
 {
@@ -109,6 +110,12 @@ static int _cancel_thread(void)
 	if (!tid) {
 		MODULE_LOG("pthread not initialized");
 		return 0;
+	}
+
+	MODULE_LOG("lock state : %d", lock);
+	while (lock) {
+		usleep(100);
+		MODULE_LOG("already locked...");
 	}
 
 	__haptic_predefine_action(gbuffer.handle, STOP, NULL);
@@ -170,7 +177,9 @@ static void* __play_cb(void *arg)
 			for (k = 0; k < pbuffer->channels; ++k) {
 				ch = pbuffer->ppbuffer[k][j];
 				if (ch != prev) {
+					lock = 1;
 					__haptic_predefine_action(pbuffer->handle, LEVEL, ch);
+					lock = 0;
 					prev = ch;
 				}
 				usleep(BITPERMS * 1000);
