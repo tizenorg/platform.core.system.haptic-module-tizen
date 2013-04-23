@@ -55,7 +55,8 @@ typedef struct {
 
 static pthread_t tid;
 static BUFFER gbuffer;
-static int lock;
+static int stop;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int _check_valid_haptic_format(HapticFile *file)
 {
@@ -112,13 +113,16 @@ static int _cancel_thread(void)
 		return 0;
 	}
 
-	MODULE_LOG("lock state : %d", lock);
-	while (lock) {
-		usleep(100);
-		MODULE_LOG("already locked...");
-	}
+	MODULE_LOG("cancel thread!!!");
 
+	stop = 1;
+
+	while (pthread_mutex_trylock(&mutex) == EBUSY) {
+		usleep(100);
+		MODULE_LOG("Already locked..");
+	}
 	__haptic_predefine_action(gbuffer.handle, STOP, NULL);
+	pthread_mutex_unlock(&mutex);
 
 	if ((ret = pthread_cancel(tid)) < 0) {
 		MODULE_ERROR("pthread_cancel is failed : %s, ret(%d)", strerror(errno), ret);
@@ -148,6 +152,8 @@ static void __clean_up(void *arg)
 
 	MODULE_LOG("clean up handler!!! : %d", tid);
 
+	stop = 0;
+
 	for (i = 0; i < pbuffer->channels; ++i) {
 		free(pbuffer->ppbuffer[i]);
 		pbuffer->ppbuffer[i] = NULL;
@@ -175,13 +181,17 @@ static void* __play_cb(void *arg)
 	for (i = 0; i < pbuffer->iteration; i++) {
 		for (j = 0; j < pbuffer->length; ++j) {
 			for (k = 0; k < pbuffer->channels; ++k) {
+				pthread_mutex_lock(&mutex);
+				if (stop) {
+					pthread_mutex_unlock(&mutex);
+					pthread_exit((void*)0);
+				}
 				ch = pbuffer->ppbuffer[k][j];
 				if (ch != prev) {
-					lock = 1;
 					__haptic_predefine_action(pbuffer->handle, LEVEL, ch);
-					lock = 0;
 					prev = ch;
 				}
+				pthread_mutex_unlock(&mutex);
 				usleep(BITPERMS * 1000);
 			}
 		}

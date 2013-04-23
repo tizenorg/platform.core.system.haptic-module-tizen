@@ -98,6 +98,7 @@ static int __sysnoti_send(struct sysnoti_type *msg)
 		close(sockfd);
 		return -1;
 	}
+	MODULE_LOG("connect : %x", sockfd);
 
 	__send_int(sockfd, msg->pid);
 	__send_int(sockfd, msg->cmd);
@@ -107,6 +108,7 @@ static int __sysnoti_send(struct sysnoti_type *msg)
 	for (i = 0; i < msg->argc; i++)
 		__send_str(sockfd, msg->argv[i]);
 
+	MODULE_LOG("read");
 	retry_cnt = 0;
 	while ((r = read(sockfd, &ret, sizeof(int))) < 0) {
 
@@ -126,6 +128,7 @@ static int __sysnoti_send(struct sysnoti_type *msg)
 		++retry_cnt;
 	}
 
+	MODULE_LOG("close (ret : %d) : %x", ret, sockfd);
 	close(sockfd);
 	return ret;
 }
