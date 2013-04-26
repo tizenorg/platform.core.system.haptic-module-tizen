@@ -130,10 +130,11 @@ static int _cancel_thread(void)
 	}
 
 	if (pthread_join(tid, (void**)&ptr) < 0) {
-        tid = 0;
 		MODULE_ERROR("pthread_join is failed : %s", strerror(errno));
 		return -1;
 	}
+
+	stop = 0;
 
     tid = 0;
 	if (ptr == PTHREAD_CANCELED) {
@@ -151,8 +152,6 @@ static void __clean_up(void *arg)
 	int i;
 
 	MODULE_LOG("clean up handler!!! : %d", tid);
-
-	stop = 0;
 
 	for (i = 0; i < pbuffer->channels; ++i) {
 		free(pbuffer->ppbuffer[i]);
@@ -196,6 +195,10 @@ static void* __play_cb(void *arg)
 			}
 		}
 	}
+
+	pthread_mutex_lock(&mutex);
+	__haptic_predefine_action(gbuffer.handle, STOP, NULL);
+	pthread_mutex_unlock(&mutex);
 
 	pthread_cleanup_pop(1);
 	pthread_exit((void *)0);
