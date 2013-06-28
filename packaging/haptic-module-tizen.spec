@@ -6,6 +6,7 @@ Release:    9
 Group:      System/Libraries
 License:    APLv2
 Source0:    %{name}-%{version}.tar.gz
+Source1001: 	haptic-module-tizen.manifest
 BuildRequires: cmake
 BuildRequires: pkgconfig(dlog)
 BuildRequires: pkgconfig(vconf)
@@ -19,6 +20,7 @@ Requires(postun): /sbin/ldconfig
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 %build
 %if 0%{?simulator}
@@ -40,4 +42,5 @@ rm -rf %{buildroot}
 %postun -p /sbin/ldconfig
 
 %files
+%manifest %{name}.manifest
 %{_libdir}/libhaptic-module.so
