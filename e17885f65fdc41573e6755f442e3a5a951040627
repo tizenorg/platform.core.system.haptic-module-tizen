@@ -1,0 +1,8 @@
+Change-Id: Ie17885f65fdc41573e6755f442e3a5a951040627
+Code-Review+2: Ryan Ware <ware@linux.intel.com>
+Verified+1: Ryan Ware <ware@linux.intel.com>
+Submitted-by: Ryan Ware <ware@linux.intel.com>
+Submitted-at: Mon, 08 Jul 2013 10:08:25 -0700
+Reviewed-on: https://review.tizen.org/gerrit/4398
+Project: platform/core/system/haptic-module-tizen
+Branch: refs/heads/tizen
