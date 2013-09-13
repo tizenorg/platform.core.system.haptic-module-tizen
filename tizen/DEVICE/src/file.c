@@ -121,7 +121,7 @@ static int _cancel_thread(void)
 		usleep(100);
 		MODULE_LOG("Already locked..");
 	}
-	__haptic_predefine_action(gbuffer.handle, STOP, NULL);
+
 	pthread_mutex_unlock(&mutex);
 
 	if ((ret = pthread_cancel(tid)) < 0) {
@@ -163,6 +163,11 @@ static void __clean_up(void *arg)
 
 	pbuffer->channels = 0;
 	pbuffer->length = 0;
+
+        if(stop){
+             __haptic_predefine_action(gbuffer.handle, STOP, NULL);
+             pthread_mutex_unlock(&mutex);
+        }
 }
 
 static void* __play_cb(void *arg)
@@ -182,7 +187,6 @@ static void* __play_cb(void *arg)
 			for (k = 0; k < pbuffer->channels; ++k) {
 				pthread_mutex_lock(&mutex);
 				if (stop) {
-					pthread_mutex_unlock(&mutex);
 					pthread_exit((void*)0);
 				}
 				ch = pbuffer->ppbuffer[k][j];
