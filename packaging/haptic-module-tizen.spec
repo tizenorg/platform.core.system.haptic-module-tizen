@@ -44,3 +44,4 @@ rm -rf %{buildroot}
 %files
 %manifest %{name}.manifest
 %{_libdir}/libhaptic-module.so
+%license LICENSE.APLv2
