@@ -37,6 +37,9 @@ make %{?jobs:-j%jobs}
 rm -rf %{buildroot}
 %make_install
 
+mkdir -p %{buildroot}%{_datadir}/license
+cp LICENSE.APLv2 %{buildroot}%{_datadir}/license/%{name}
+
 %post -p /sbin/ldconfig
 
 %postun -p /sbin/ldconfig
@@ -44,3 +47,4 @@ rm -rf %{buildroot}
 %files
 %manifest %{name}.manifest
 %{_libdir}/libhaptic-module.so
+%{_datadir}/license/%{name}
